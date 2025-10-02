@@ -47,3 +47,7 @@ local.mk
 # cscope and Qt files
 cscope.out
 *.pro*
+
+# CMake: Common build outputs
+out/
+build/
