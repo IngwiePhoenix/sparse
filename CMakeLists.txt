@@ -145,14 +145,14 @@ target_sources(libsparse
 # Add the platform-dependent compat's
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(libsparse PRIVATE compat-linux.c)
-elseif(CMAKE_SYSTEM_NAME ENDS_WITH "BSD" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+elseif(CMAKE_SYSTEM_NAME MATCHES ".*BSD$" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_sources(libsparse PRIVATE compat-bsd.c)
 elseif(CYGWIN)
     target_sources(libsparse PRIVATE compat-cygwin.c)
 elseif(MINGW)
     target_sources(libsparse PRIVATE compat-mingw.c)
-#elseif(WIN32) # TODO
-#    target_sources(libsparse PRIVATE compat-win32.c)
+elseif(WIN32) # TODO
+    target_sources(libsparse PRIVATE compat-win32.c)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
     target_sources(libsparse PRIVATE compat-solaris.c)
 else()
@@ -189,6 +189,12 @@ else()
     set(MULTIARCH "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-probablynotgnu")
 endif()
 target_compile_definitions(libsparse PRIVATE MULTIARCH_TRIPLET="${MULTIARCH}")
+
+# Take care of MSVC warnings
+if(MSVC)
+    target_compile_options(libsparse PRIVATE /wd4311 /w4312)
+endif()
+
 
 target_include_directories(libsparse
     PUBLIC
@@ -338,23 +344,26 @@ foreach(test_name IN LISTS SPARSE_TESTS)
 endforeach()
 
 # test-inspect is a GTK app
-set(GTK_VERSIONS 3.0 2.0)
-set(GTK_FOUND FALSE)
-foreach(GTK_VERSION IN LISTS GTK_VERSIONS)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK gtk+-${GTK_VERSION})
+# Ignore on Windows; might be doable on msys though.
+if(NOT WIN32)
+    set(GTK_VERSIONS 3.0 2.0)
+    set(GTK_FOUND FALSE)
+    foreach(GTK_VERSION IN LISTS GTK_VERSIONS)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(GTK gtk+-${GTK_VERSION})
+        if(GTK_FOUND)
+            message(STATUS "Found GTK version ${GTK_VERSION}")
+            break()
+        endif()
+    endforeach()
     if(GTK_FOUND)
-        message(STATUS "Found GTK version ${GTK_VERSION}")
-        break()
+        add_executable(test-inspect ast-model.c ast-view.c ast-inspect.c test-inspect.c)
+        target_link_libraries(test-inspect PRIVATE libsparse ${GTK_LIBRARIES})
+        target_include_directories(test-inspect PRIVATE ${GTK_INCLUDE_DIRS})
+        target_compile_options(test-inspect PRIVATE ${GTK_CFLAGS_OTHER})
+    else()
+        message(WARNING "Your system does not have GTK2/GTK3, disabling test-inspect")
     endif()
-endforeach()
-if(GTK_FOUND)
-    add_executable(test-inspect ast-model.c ast-view.c ast-inspect.c test-inspect.c)
-    target_link_libraries(test-inspect PRIVATE libsparse ${GTK_LIBRARIES})
-    target_include_directories(test-inspect PRIVATE ${GTK_INCLUDE_DIRS})
-    target_compile_options(test-inspect PRIVATE ${GTK_CFLAGS_OTHER})
-else()
-    message(WARNING "Your system does not have GTK2/GTK3, disabling test-inspect")
 endif()
 
 
